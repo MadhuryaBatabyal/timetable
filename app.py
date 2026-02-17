@@ -52,6 +52,7 @@ def get_today_name() -> str:
 
 def show_today_timetable(username: str) -> None:
     tt = load_timetable()
+    st.write("Columns:", list(tt.columns))
     today = get_today_name()
     view = tt[(tt["username"] == username) & (tt["day"] == today)].copy()
 
