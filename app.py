@@ -89,4 +89,4 @@ else:
         col2.button("🔔 Notifications")
 
 if __name__ == "__main__":
-    st.caption("Built for Zeal College Timetable System [IJCRT25A4273]") [file:1]
+    st.caption("Built for Zeal College Timetable System")
