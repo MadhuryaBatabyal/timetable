@@ -118,7 +118,7 @@ if st.session_state.user is None:
                         st.session_state.user = username
                         st.session_state.role = DEMO_USERS[username]["role"]
                         st.success(f"Welcome {username}!")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("Wrong password")
                 else:
@@ -137,7 +137,7 @@ with st.sidebar:
     if st.button("🚪 Logout"):
         st.session_state.user = None
         st.session_state.role = None
-        st.experimental_rerun()
+        st.rerun()
 
 # Role-based views
 if current_role == "Admin":
