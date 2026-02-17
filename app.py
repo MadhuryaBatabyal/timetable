@@ -1,6 +1,41 @@
 import streamlit as st
 import pandas as pd
 import hashlib
+import datetime as dt
+
+@st.cache_data
+def load_timetable():
+    return pd.read_csv("timetable.csv")
+
+def get_today_name():
+    days = ["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY","SUNDAY"]
+    return days[dt.datetime.now().weekday()]
+
+def show_today_timetable(username):
+    tt = load_timetable()
+    today = get_today_name()
+    view = tt[(tt["username"] == username) & (tt["day"] == today)]
+    view = view.sort_values("start_time")
+
+    if view.empty:
+        st.info("No classes scheduled for today 🎉")
+        return
+
+    st.subheader(f"Today's Classes – {today}")
+    st.dataframe(
+        view[["start_time","end_time","subject","course","room","teacher"]]
+        .rename(columns={
+            "start_time":"Start",
+            "end_time":"End",
+            "subject":"Subject",
+            "course":"Course",
+            "room":"Room/Lab",
+            "teacher":"Teacher"
+        }),
+        hide_index=True,
+        use_container_width=True
+    )
+
 
 # Hardcoded secure demo users (production: use Supabase/Firebase)
 DEMO_USERS = {
@@ -57,6 +92,7 @@ else:
     
     if st.session_state.role == 'Admin':
         st.header("🛠️ Admin Control Panel")
+        show_today_timetable(user)
         col1, col2, col3 = st.columns(3)
         col1.metric("Timetables", 15)
         col2.metric("Events", 8)
@@ -65,6 +101,7 @@ else:
         
     elif st.session_state.role == 'Faculty':
         st.header("📚 Faculty Schedule")
+        show_today_timetable(user)
         col1, col2 = st.columns(2)
         with col1:
             st.metric("Today", 3)
@@ -79,6 +116,7 @@ else:
     
     else:  # Student
         st.header("📅 Your Timetable - BSc Data Science 3rd Year")
+        show_today_timetable(user)
         days = ["Mon", "Tue", "Wed", "Thu", "Fri"]
         slots = ["09-10", "11-12", "14-15"]
         data = {day: [f"{sub} {room}" for sub, room in zip(["Maths A101", "DSA A102", "ML Lab1"], range(3))] for day in days}
