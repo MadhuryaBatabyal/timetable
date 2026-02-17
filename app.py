@@ -1,114 +1,98 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 import sqlite3
 import hashlib
-import yaml
-from datetime import datetime
 import pandas as pd
 
-# 1. Setup DB (runs once)
+# Secure DB
 @st.cache_resource
-def init_db():
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (username TEXT PRIMARY KEY, email TEXT, name TEXT, 
-                  hashed_password TEXT, role TEXT, created_at TEXT)''')
-    conn.commit()
-    conn.close()
+def get_connection():
+    conn = sqlite3.connect('timetable_users.db')
+    conn.execute('''CREATE TABLE IF NOT EXISTS users 
+                    (username TEXT PRIMARY KEY, password_hash TEXT, role TEXT)''')
+    return conn
 
-init_db()
+conn = get_connection()
 
-# 2. Helper functions
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-def user_exists(username):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username=?", (username,))
-    exists = c.fetchone()
-    conn.close()
-    return exists
+# Session state
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.username = None
+    st.session_state.role = None
 
-def add_user(username, email, name, password, role):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    hashed = hash_password(password)
-    c.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?)",
-              (username, email, name, hashed, role, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-
-# 3. Signup form
-def signup():
-    with st.form("signup"):
-        st.subheader("📝 Sign Up")
-        name = st.text_input("Name")
-        email = st.text_input("Email")
+# Sidebar login
+with st.sidebar:
+    st.title("🔐 Auth")
+    if not st.session_state.logged_in:
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
-        confirm_password = st.text_input("Confirm Password", type="password")
-        role = st.selectbox("Role", ["Student", "Faculty", "Admin"])
-        submitted = st.form_submit_button("Create Account")
-        
-        if submitted:
-            if password != confirm_password:
-                st.error("Passwords don't match!")
-            elif user_exists(username):
-                st.error("Username exists!")
-            else:
-                add_user(username, email, name, password, role)
-                st.success("Account created! Now login.")
+        if st.button("Login"):
+            result = conn.execute("SELECT role FROM users WHERE username=? AND password_hash=?",
+                                 (username, hash_password(password))).fetchone()
+            if result:
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.session_state.role = result[0]
+                st.success("✅ Logged in!")
                 st.rerun()
+            else:
+                st.error("❌ Invalid")
+        
+        # Demo button
+        if st.button("➕ Add Demo Users"):
+            demos = [
+                ('admin', hash_password('admin'), 'Admin'),
+                ('prof', hash_password('prof'), 'Faculty'),
+                ('student', hash_password('student'), 'Student')
+            ]
+            conn.executemany("INSERT OR IGNORE INTO users VALUES (?, ?, ?)", demos)
+            conn.commit()
+            st.success("Demo users added!")
+    else:
+        st.success(f"Hi {st.session_state.username} ({st.session_state.role})")
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.session_state.username = None
+            st.session_state.role = None
+            st.rerun()
 
-# 4. Dynamic authenticator (reads from DB)
-@st.cache_data(ttl=600)  # Refresh every 10 min
-def get_credentials():
-    conn = sqlite3.connect('users.db')
-    df = pd.read_sql("SELECT username, name, email FROM users", conn)
-    conn.close()
-    config = {'credentials': {'usernames': {}}}
-    for _, row in df.iterrows():
-        config['credentials']['usernames'][row['username']] = {
-            'name': row['name'], 'email': row['email']}
-    return config
-
-config = get_credentials()
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    'timetable_app', 'your_secret_key_abc123', 30
-)
-
-# 5. Main app
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-
-name, authentication_status, username = authenticator.login(location='main')
-
-if auth_status:
-    st.session_state.authenticated = True
-    st.success(f'Welcome {name}!')
-    
-    # Get role from DB
-    conn = sqlite3.connect('users.db')
-    role = pd.read_sql("SELECT role FROM users WHERE username=?", conn, params=(username,)).iloc[0]['role']
-    conn.close()
+# Main content (protected)
+if st.session_state.logged_in:
+    role = st.session_state.role
     
     if role == 'Admin':
-        st.header("🛠️ Admin Panel")
-        st.button("Create Timetable")
+        st.header("🛠️ Admin Dashboard")
+        col1, col2 = st.columns(2)
+        col1.button("📊 Generate Timetable")
+        col2.button("📅 Manage Events")
+        st.dataframe(pd.DataFrame({"Action": ["Create TT", "Reschedule", "Notifications"], 
+                                  "Status": ["Ready", "Ready", "Ready"]}))
+    
     elif role == 'Faculty':
-        st.header("📚 Faculty Dashboard")
-        st.dataframe(pd.DataFrame({'Today': ['9AM: DSA', '11AM: ML']}))
+        st.header("📚 Faculty View")
+        st.metric("Today's Slots", 3)
+        timetable = pd.DataFrame({
+            "Time": ["9:00-10:00", "11:00-12:00", "14:00-15:00"],
+            "Subject": ["Data Science", "Machine Learning", "Stats"],
+            "Room": ["A-101", "A-102", "A-103"],
+            "Students": [45, 40, 50]
+        })
+        st.dataframe(timetable)
+    
     else:  # Student
-        st.header("📖 Your Timetable")
-        st.dataframe(pd.DataFrame({'Mon': ['Math 9AM', 'DSA 11AM'], 'Tue': ['ML 9AM', 'Stats 11AM']}))
-    
-    authenticator.logout('Logout', 'main')
-    
-elif auth_status == False:
-    st.error('Wrong credentials')
-    signup()
+        st.header("📅 Your Timetable")
+        student_tt = pd.DataFrame({
+            "Day": ["Monday", "Tuesday", "Wednesday"],
+            "9-10AM": ["Maths", "ML", "Physics"],
+            "11-12PM": ["DSA", "Stats", "Project"],
+            "Room": ["B101", "B102", "Lab1"]
+        })
+        st.dataframe(student_tt)
+        st.caption("💡 Updated: Feb 17, 2026")
+        
 else:
-    signup()
+    st.info("👈 Sidebar: Add demo users (admin/admin, prof/prof, student/student) then login!")
+
+conn.close()
