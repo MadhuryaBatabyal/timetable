@@ -84,7 +84,7 @@ authenticator = stauth.Authenticate(
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
-name, auth_status, username = authenticator.login('🔐 Login', 'main')
+name, authentication_status, username = authenticator.login(location='main')
 
 if auth_status:
     st.session_state.authenticated = True
