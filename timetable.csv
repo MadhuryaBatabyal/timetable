@@ -2,7 +2,7 @@ role,username,day,start_time,end_time,subject,course,room,teacher
 Student,bsda2,MONDAY,08:40,09:30,TC - OS,BSDA-II,R-304,TC-OS
 Student,bsda2,MONDAY,09:30,10:20,OS,BSDA-II,R-304,TC-OS
 Student,bsda2,MONDAY,10:20,11:10,R PROGRAMMING LAB (Batch 1),BSDA-II,304/306/303/LH2,Lab Faculty
-Student,bsda2,MONDAY,11:10,11:40,BREAK,BSDA-II,,,
+Student,bsda2,MONDAY,11:10,11:40,BREAK,BSDA-II,,
 Student,bsda2,MONDAY,11:40,12:30,LANGUAGE,BSDA-II,304/306/303/LH2,Language Faculty
 Student,bsda2,MONDAY,12:30,01:20,R PROGRAMMING,BSDA-II,R-304,TC-R
 Student,bsda2,MONDAY,01:20,02:10,OS LAB (Batch 2),BSDA-II,Lab,Lab Faculty
@@ -214,3 +214,4 @@ Student,bsda6,SATURDAY,02:10,03:00,FREE,BDSA-VI,,,
 Student,bsda6,SATURDAY,03:00,03:50,FREE,BDSA-VI,,,
 Student,bsda6,SATURDAY,03:50,04:40,FREE,BDSA-VI,,,
 Student,bsda6,SATURDAY,04:40,05:30,FREE,BDSA-VI,,,
+
