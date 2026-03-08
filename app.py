@@ -44,14 +44,20 @@ def generate_timetable(section):
 
     courses["classes_per_week"] = courses.apply(classes_per_week, axis=1)
 
-    # expand into class units
-    to_schedule = []
+    # Build per-course schedule list with target days (round‑robin)
+    per_course_slots = []
     for _, row in courses.iterrows():
-        for _ in range(row["classes_per_week"]):
-            to_schedule.append({
-                "course_code": row["course_code"],
-                "course_title": row["course_title"],
-                "type": row["type"].lower(),
+        code = row["course_code"]
+        title = row["course_title"]
+        ctype = row["type"].lower()
+        n = int(row["classes_per_week"])
+        for i in range(n):
+            target_day = DAYS[i % len(DAYS)]  # spread across days
+            per_course_slots.append({
+                "course_code": code,
+                "course_title": title,
+                "type": ctype,
+                "target_day": target_day,
             })
 
     # empty grid
@@ -69,35 +75,45 @@ def generate_timetable(section):
                 return False
         return True
 
-    # greedy scheduler
     warnings = []
-    for cls in to_schedule:
+
+    # First schedule all theory classes on their target_day (fallback to others only if needed)
+    for cls in [c for c in per_course_slots if c["type"] == "theory"]:
         placed = False
-        for day in DAYS:
+        preferred_days = [cls["target_day"]] + [d for d in DAYS if d != cls["target_day"]]
+        for day in preferred_days:
             if placed:
                 break
-            if cls["type"] == "lab":
-                for i in range(len(SLOTS) - 1):
-                    s1, s2 = SLOTS[i], SLOTS[i + 1]
-                    if BREAK_SLOT in (s1, s2):
-                        continue
-                    if can_place(day, s1, cls["course_code"]) and can_place(day, s2, cls["course_code"]):
-                        timetable[day][s1] = f"{cls['course_code']} (LAB)"
-                        timetable[day][s2] = f"{cls['course_code']} (LAB)"
-                        placed = True
-                        break
-            else:
-                for slot in SLOTS:
-                    if slot == BREAK_SLOT:
-                        continue
-                    if can_place(day, slot, cls["course_code"]):
-                        timetable[day][slot] = cls["course_code"]
-                        placed = True
-                        break
+            for slot in SLOTS:
+                if slot == BREAK_SLOT:
+                    continue
+                if can_place(day, slot, cls["course_code"]):
+                    timetable[day][slot] = cls["course_code"]
+                    placed = True
+                    break
         if not placed:
             warnings.append(f"Could not place all classes for {cls['course_code']}")
 
-    # convert to DataFrame
+    # Then schedule lab blocks (2 consecutive slots) on their target_day
+    for cls in [c for c in per_course_slots if c["type"] == "lab"]:
+        placed = False
+        preferred_days = [cls["target_day"]] + [d for d in DAYS if d != cls["target_day"]]
+        for day in preferred_days:
+            if placed:
+                break
+            for i in range(len(SLOTS) - 1):
+                s1, s2 = SLOTS[i], SLOTS[i + 1]
+                if BREAK_SLOT in (s1, s2):
+                    continue
+                if can_place(day, s1, cls["course_code"]) and can_place(day, s2, cls["course_code"]):
+                    timetable[day][s1] = f"{cls['course_code']} (LAB)"
+                    timetable[day][s2] = f"{cls['course_code']} (LAB)"
+                    placed = True
+                    break
+        if not placed:
+            warnings.append(f"Could not place all LAB blocks for {cls['course_code']}")
+
+    # DataFrame output
     rows = []
     for day in DAYS:
         for slot in SLOTS:
